@@ -740,6 +740,7 @@ enum sev_cmd_id {
 	KVM_SEV_SNP_LAUNCH_START = 100,
 	KVM_SEV_SNP_LAUNCH_UPDATE,
 	KVM_SEV_SNP_LAUNCH_FINISH,
+	KVM_SEV_SNP_HV_REPORT_REQ,
 
 	KVM_SEV_NR_MAX,
 };
@@ -874,6 +875,12 @@ struct kvm_sev_snp_launch_start {
 	__u16 flags;
 	__u8 pad0[6];
 	__u64 pad1[4];
+};
+
+struct kvm_sev_snp_hv_report_req {
+	__u8 key_sel;
+	__u64 report_uaddr;
+	__u64 report_len;
 };
 
 /* Kept in sync with firmware values for simplicity. */

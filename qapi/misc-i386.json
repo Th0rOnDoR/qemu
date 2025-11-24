@@ -293,6 +293,33 @@
   'returns': 'SevAttestationReport' }
 
 ##
+# @query-sev-snp-report-request:
+#
+# Get the SEV-SNP report request.
+#
+# This is only valid on x86 machines configured with KVM and the
+# 'sev-guest' confidential virtualization object..
+#
+# @key: key to sign the report with
+#
+# Errors:
+#     - If the attestation report is unavailable, either due to an
+#       invalid guest configuration or because the guest has not
+#       reached the required SEV state, GenericError
+#
+# Since: 6.1
+#
+# .. qmp-example::
+#
+#     -> { "execute" : "query-sev-snp-report-request" }
+#                      "arguments": { "key": 1 } }
+#     <- { "return" : { "data": "aaaaaaaabbbddddd"} }
+##
+{ 'command': 'query-sev-snp-report-request',
+  'data': { 'key': 'int' },
+  'returns': 'SevAttestationReport' }  
+
+##
 # @SgxEpcSection:
 #
 # Information about intel SGX EPC section

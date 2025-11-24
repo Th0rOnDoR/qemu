@@ -1037,6 +1037,49 @@ SevAttestationReport *qmp_query_sev_attestation_report(const char *mnonce,
     return sev_get_attestation_report(mnonce, errp);
 }
 
+static SevAttestationReport *sev_snp_report_request(int64_t key, Error **errp)
+{
+    struct kvm_sev_snp_hv_report_req input = {};
+    SevAttestationReport *report = NULL;
+    SevCommonState *sev_common;
+    g_autofree guchar *data = NULL;
+    int err = 0, ret;
+
+    if (!sev_snp_enabled()) {
+        error_setg(errp, "SEV-SNP is not enabled");
+        return NULL;
+    }
+
+    sev_common = SEV_COMMON(MACHINE(qdev_get_machine())->cgs);
+
+    /* SNP report size is 1184 byte */
+    input.report_len = 1184;
+    data = g_malloc(input.report_len);
+    input.report_uaddr = (unsigned long)data;
+    input.key_sel = key;
+
+    /* Query the report */
+    ret = sev_ioctl(sev_common->sev_fd, KVM_SEV_SNP_HV_REPORT_REQ,
+            &input, &err);
+    if (ret) {
+        error_setg_errno(errp, errno, "SEV-SNP: Failed to get attestation report"
+                " ret=%d fw_err=%d (%s)", ret, err, fw_error_to_str(err));
+        return NULL;
+    }
+
+    report = g_new0(SevAttestationReport, 1);
+    report->data = g_base64_encode(data, input.report_len);
+
+    trace_kvm_sev_snp_report_request(report->data);
+
+    return report;
+}
+
+SevAttestationReport *qmp_query_sev_snp_report_request(int64_t key, Error **errp)
+{
+    return sev_snp_report_request(key, errp);
+}
+
 static int
 sev_read_file_base64(const char *filename, guchar **data, gsize *len)
 {
