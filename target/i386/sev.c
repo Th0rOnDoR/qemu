@@ -13,6 +13,7 @@
 
 #include "qemu/osdep.h"
 
+#include <asm-generic/errno-base.h>
 #include <linux/kvm.h>
 #include <linux/kvm_para.h>
 #include <linux/psp-sev.h>
@@ -1035,6 +1036,64 @@ SevAttestationReport *qmp_query_sev_attestation_report(const char *mnonce,
                                                        Error **errp)
 {
     return sev_get_attestation_report(mnonce, errp);
+}
+
+static SevAttestationReport *sev_snp_report_request(int64_t key, Error **errp)
+{
+    struct kvm_sev_snp_hv_report_req input = {};
+    SevAttestationReport *report = NULL;
+    SevCommonState *sev_common;
+    g_autofree struct sev_data_snp_msg_report_rsp *data = NULL;
+    int err = 0, ret;
+
+    if (!sev_snp_enabled()) {
+        error_setg(errp, "SEV-SNP is not enabled");
+        return NULL;
+    }
+
+    sev_common = SEV_COMMON(MACHINE(qdev_get_machine())->cgs);
+    
+    input.report_len = sizeof(struct sev_data_snp_msg_report_rsp);
+    data = g_malloc(input.report_len);
+    input.report_uaddr = (unsigned long)data;
+    input.key_sel = key;
+    
+    /* Query the report length */
+    ret = sev_ioctl(sev_common->sev_fd, KVM_SEV_SNP_HV_REPORT_REQ,
+        &input, &err);
+    if (ret < 0) {
+        /* The firmware doesn't report lenght error */
+        if (ret != -ENOSPC) {
+            error_setg(errp, "SEV-SNP: Failed to query the attestation size"
+                " length ret=%d fw_err=%d (%s)",
+                ret, err, fw_error_to_str(err));
+                return NULL;
+        }
+    }
+        
+    data = g_realloc(data, data->report_size);
+    input.report_uaddr = (unsigned long)data;
+    
+    /* Query the report */
+    ret = sev_ioctl(sev_common->sev_fd, KVM_SEV_SNP_HV_REPORT_REQ,
+            &input, &err);
+    if (ret) {
+        error_setg_errno(errp, errno, "SEV-SNP: Failed to get attestation report"
+                " ret=%d fw_err=%d (%s)", ret, err, fw_error_to_str(err));
+        return NULL;
+    }
+
+    report = g_new0(SevAttestationReport, 1);
+    report->data = g_base64_encode((guchar *) data->report, input.report_len);
+
+    trace_kvm_sev_snp_report_request(report->data);
+
+    return report;
+}
+
+SevAttestationReport *qmp_query_sev_snp_report_request(int64_t key, Error **errp)
+{
+    return sev_snp_report_request(key, errp);
 }
 
 static int

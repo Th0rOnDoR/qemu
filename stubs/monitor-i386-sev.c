@@ -34,3 +34,9 @@ SevAttestationReport *qmp_query_sev_attestation_report(const char *mnonce,
     error_setg(errp, "SEV is not available in this QEMU");
     return NULL;
 }
+SevAttestationReport *qmp_query_sev_snp_report_request(int64_t key,
+                                                       Error **errp)
+{
+    error_setg(errp, "SEV is not available in this QEMU");
+    return NULL;
+}
